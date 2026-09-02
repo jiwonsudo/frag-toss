@@ -13,7 +13,7 @@ export class ResultScene implements GameScene {
   private t = 0;
 
   constructor(game: Game, result: StageResult) {
-    buildEnvironment(this.three);
+    buildEnvironment(this.three, game.renderer);
     this.camera.position.set(0, 1.7, 6);
     this.camera.lookAt(0, 1.1, -12);
 

@@ -57,7 +57,7 @@ export class GameplayScene implements GameScene {
     this.grenadesTotal = this.level.grenades ?? GAMEPLAY.defaultGrenades;
     this.grenadesLeft = this.grenadesTotal;
 
-    buildEnvironment(this.three);
+    buildEnvironment(this.three, this.game.renderer);
     this.physics.addGround();
 
     if (this.level.camera) {

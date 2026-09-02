@@ -38,7 +38,8 @@ pnpm preview  # 빌드 결과 미리보기
 
 | 블록 | 용도 |
 |---|---|
-| `RENDER` / `CAMERA` | FOV, 안개, 기본 카메라 위치/시선 |
+| `RENDER` / `CAMERA` | FOV, 톤매핑 노출, 지수 안개, 기본 카메라 위치/시선 |
+| `SKY` | 태양 고도/방위, 하늘 탁도/산란, 태양광·IBL·반구광 세기 |
 | `PHYSICS` | 중력, 고정 스텝, 수류탄 물성(담핑으로 구르는 정도 조절) |
 | `SWIPE` | 최소 거리/시간, `powerScale`, 발사 속도 클램프, `yawRange`/`pitchRange` |
 | `COOK` | `durationMs`(신관 총 시간=게이지 참 시간), `dangerFrom`(위험색 임계), `cookOffInHand` |
@@ -65,14 +66,15 @@ src/
   input/        SwipeController.ts (스와이프 → 3D 발사 벡터, 카메라 기준)
   gameplay/
     PhysicsWorld.ts       Rapier 월드 래퍼 (고정 스텝 누적)
-    Environment.ts        조명 + 안개 + 바닥
+    Environment.ts        절차적 하늘(Sky)+태양+IBL+지수안개+절차적 지형 (배그풍 톤)
     Grenade / Enemy / Wall
     TrajectoryPreview.ts  해석적 포물선 적분 → InstancedMesh 점
     ExplosionSystem.ts    거리 기반 스플래시 + 파티클 + 섬광 + 카메라 흔들림
     ScoreSystem.ts        별점 계산
   scenes/       MenuScene / LevelSelectScene / GameScene / ResultScene
   ui/           overlay.ts (DOM 오버레이 UI 헬퍼 — 메뉴/HUD)
-  utils/        three.ts (카메라/정리 헬퍼), storage.ts (localStorage 진행도)
+  utils/        three.ts (카메라/정리 헬퍼), storage.ts (진행도),
+                procedural.ts (캔버스 지형 텍스처 생성)
 ```
 
 메뉴/스테이지 선택/결과 화면은 3D 씬 위에 **HTML DOM 오버레이**(`#ui`)로 UI를 그림.

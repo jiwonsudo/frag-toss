@@ -12,7 +12,7 @@ export class MenuScene implements GameScene {
   private t = 0;
 
   constructor(game: Game) {
-    buildEnvironment(this.three);
+    buildEnvironment(this.three, game.renderer);
 
     // 배경 소품
     const wallMat = new THREE.MeshStandardMaterial({ color: COLORS.wall, roughness: 0.9 });

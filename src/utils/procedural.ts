@@ -1,0 +1,135 @@
+import * as THREE from 'three';
+
+/**
+ * 에셋 없이 캔버스로 지형 텍스처(알베도 / 노멀 / 러프니스)를 생성.
+ * 나중에 실사 PBR 텍스처(ambientCG 등)로 교체하려면 이 함수만 갈아끼우면 됨.
+ */
+
+const SIZE = 512;
+
+function hash(x: number, y: number): number {
+  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function valueNoise(x: number, y: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const xf = x - xi;
+  const yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf);
+  const v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi);
+  const b = hash(xi + 1, yi);
+  const c = hash(xi, yi + 1);
+  const d = hash(xi + 1, yi + 1);
+  return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+}
+
+function fbm(x: number, y: number, octaves = 5): number {
+  let sum = 0;
+  let amp = 0.5;
+  let freq = 1;
+  for (let i = 0; i < octaves; i++) {
+    sum += amp * valueNoise(x * freq, y * freq);
+    freq *= 2.03;
+    amp *= 0.5;
+  }
+  return sum;
+}
+
+function mix(a: number[], b: number[], t: number): number[] {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+export interface GroundTextures {
+  map: THREE.Texture;
+  normalMap: THREE.Texture;
+  roughnessMap: THREE.Texture;
+}
+
+export function makeGroundTextures(repeat = 60): GroundTextures {
+  const soil = [58, 47, 33];
+  const dryGrass = [124, 116, 74];
+  const grass = [78, 92, 52];
+  const patch = [150, 140, 92];
+
+  const height = new Float32Array(SIZE * SIZE);
+  const albedo = document.createElement('canvas');
+  albedo.width = albedo.height = SIZE;
+  const actx = albedo.getContext('2d')!;
+  const aimg = actx.createImageData(SIZE, SIZE);
+
+  const rough = document.createElement('canvas');
+  rough.width = rough.height = SIZE;
+  const rctx = rough.getContext('2d')!;
+  const rimg = rctx.createImageData(SIZE, SIZE);
+
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const i = y * SIZE + x;
+      const nx = (x / SIZE) * 8;
+      const ny = (y / SIZE) * 8;
+
+      const big = fbm(nx, ny, 5);
+      const detail = fbm(nx * 6 + 20, ny * 6 + 20, 4);
+      const h = big * 0.7 + detail * 0.3;
+      height[i] = h;
+
+      // 색 혼합: 저지대=흙, 중간=풀, 밝은 노이즈=마른 풀/흙 패치
+      let col = mix(soil, grass, THREE.MathUtils.clamp(big * 1.6, 0, 1));
+      col = mix(col, dryGrass, THREE.MathUtils.clamp(detail * 1.4, 0, 1));
+      if (big > 0.62) col = mix(col, patch, (big - 0.62) * 2.4);
+      const grain = 0.86 + hash(x * 3.1, y * 7.7) * 0.28;
+
+      const p = i * 4;
+      aimg.data[p] = THREE.MathUtils.clamp(col[0] * grain, 0, 255);
+      aimg.data[p + 1] = THREE.MathUtils.clamp(col[1] * grain, 0, 255);
+      aimg.data[p + 2] = THREE.MathUtils.clamp(col[2] * grain, 0, 255);
+      aimg.data[p + 3] = 255;
+
+      const r = 235 - detail * 60 + hash(x * 1.7, y * 2.3) * 12;
+      rimg.data[p] = rimg.data[p + 1] = rimg.data[p + 2] = THREE.MathUtils.clamp(r, 0, 255);
+      rimg.data[p + 3] = 255;
+    }
+  }
+  actx.putImageData(aimg, 0, 0);
+  rctx.putImageData(rimg, 0, 0);
+
+  // 노멀맵: 높이장의 기울기에서 계산
+  const normal = document.createElement('canvas');
+  normal.width = normal.height = SIZE;
+  const nctx = normal.getContext('2d')!;
+  const nimg = nctx.createImageData(SIZE, SIZE);
+  const strength = 2.2;
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const l = height[y * SIZE + ((x - 1 + SIZE) % SIZE)];
+      const r = height[y * SIZE + ((x + 1) % SIZE)];
+      const u = height[((y - 1 + SIZE) % SIZE) * SIZE + x];
+      const d = height[((y + 1) % SIZE) * SIZE + x];
+      const nvec = new THREE.Vector3((l - r) * strength, (u - d) * strength, 1).normalize();
+      const p = (y * SIZE + x) * 4;
+      nimg.data[p] = (nvec.x * 0.5 + 0.5) * 255;
+      nimg.data[p + 1] = (nvec.y * 0.5 + 0.5) * 255;
+      nimg.data[p + 2] = (nvec.z * 0.5 + 0.5) * 255;
+      nimg.data[p + 3] = 255;
+    }
+  }
+  nctx.putImageData(nimg, 0, 0);
+
+  const mk = (canvas: HTMLCanvasElement, srgb: boolean): THREE.Texture => {
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repeat, repeat);
+    tex.anisotropy = 8;
+    if (srgb) tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  };
+
+  return {
+    map: mk(albedo, true),
+    normalMap: mk(normal, false),
+    roughnessMap: mk(rough, false)
+  };
+}

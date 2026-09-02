@@ -7,11 +7,30 @@
 export const RENDER = {
   fov: 72,
   near: 0.05,
-  far: 300,
-  // 배경/안개 색
-  sky: 0x0e1116,
-  fogNear: 30,
-  fogFar: 120
+  far: 2000,
+  // ACES 톤매핑 노출.
+  exposure: 0.82,
+  // 지수 안개(FogExp2) 밀도 + 색 (배그풍 옅은 헤이즈).
+  fogColor: 0xbcc6cc,
+  fogDensity: 0.014
+};
+
+/** 절차적 하늘(three Sky) + 태양. 에셋 없이 실사풍 하늘/조명 생성. */
+export const SKY = {
+  // 태양 위치 (도).
+  sunElevation: 18,
+  sunAzimuth: 155,
+  turbidity: 6,
+  rayleigh: 2.2,
+  mieCoefficient: 0.006,
+  mieDirectionalG: 0.82,
+  // 태양광(DirectionalLight) 세기/색.
+  sunLightIntensity: 3.2,
+  sunLightColor: 0xfff1dc,
+  // 환경광(IBL) 반영 세기.
+  envIntensity: 0.75,
+  // 하늘 기반 보조 반구광.
+  hemiIntensity: 0.25
 };
 
 export const CAMERA = {

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { GameScene, SceneFactory } from './Scene';
 import type { StageResult } from '../config/types';
+import { RENDER } from '../config/constants';
 import { MenuScene } from '../scenes/MenuScene';
 import { LevelSelectScene } from '../scenes/LevelSelectScene';
 import { GameplayScene } from '../scenes/GameScene';
@@ -25,6 +26,9 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // 배그풍 실사 톤: ACES 필믹 톤매핑 + 노출
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = RENDER.exposure;
 
     window.addEventListener('resize', this.handleResize);
     this.handleResize();

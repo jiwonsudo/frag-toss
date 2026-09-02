@@ -18,14 +18,22 @@ export function v3(v: Vec3): THREE.Vector3 {
   return new THREE.Vector3(v.x, v.y, v.z);
 }
 
-/** 씬 하위 지오메트리/머티리얼을 재귀적으로 해제. */
+/** 씬 하위 지오메트리/머티리얼/텍스처를 재귀적으로 해제. */
 export function disposeScene(scene: THREE.Scene): void {
   scene.traverse((obj) => {
     const mesh = obj as THREE.Mesh;
     if (mesh.geometry) mesh.geometry.dispose();
-    const mat = (mesh as THREE.Mesh).material;
-    if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-    else if (mat) (mat as THREE.Material).dispose();
+    const mat = mesh.material;
+    const mats = Array.isArray(mat) ? mat : mat ? [mat] : [];
+    for (const m of mats) {
+      const rec = m as unknown as Record<string, unknown>;
+      for (const k in rec) {
+        if (rec[k] instanceof THREE.Texture) (rec[k] as THREE.Texture).dispose();
+      }
+      m.dispose();
+    }
   });
+  if (scene.environment) scene.environment.dispose();
+  scene.environment = null;
   scene.clear();
 }
