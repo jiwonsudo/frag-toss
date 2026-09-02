@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#0e1116" />
+    <title>수류탄 던지기 (1인칭 3D)</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0e1116;
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none;
+        user-select: none;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+      }
+      #scene {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      /* UI 오버레이: 기본은 터치 통과, 실제 컨트롤만 터치 수신 */
+      #ui {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        color: #fff;
+      }
+      #ui > * {
+        pointer-events: auto;
+      }
+      .ui-center {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        padding: 24px;
+        box-sizing: border-box;
+        text-align: center;
+      }
+      .ui-title {
+        font-size: clamp(28px, 8vw, 52px);
+        font-weight: 800;
+        margin: 0;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+      }
+      .ui-sub {
+        font-size: clamp(13px, 3.6vw, 18px);
+        color: #9aa4b2;
+        margin: 0;
+      }
+      .ui-btn {
+        pointer-events: auto;
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        background: rgba(15, 52, 96, 0.85);
+        color: #fff;
+        font-size: clamp(16px, 4.5vw, 22px);
+        font-weight: 600;
+        padding: 14px 28px;
+        border-radius: 12px;
+        min-width: 220px;
+        cursor: pointer;
+        backdrop-filter: blur(4px);
+      }
+      .ui-btn:active {
+        background: rgba(26, 74, 122, 0.95);
+      }
+      .ui-btn[disabled] {
+        opacity: 0.4;
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      .ui-btn.secondary {
+        background: rgba(22, 33, 62, 0.85);
+      }
+      /* 상단 HUD */
+      .hud {
+        position: absolute;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 16px;
+        font-size: clamp(14px, 4vw, 20px);
+        font-weight: 700;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+      }
+      .hud .pill {
+        background: rgba(0, 0, 0, 0.35);
+        border-radius: 999px;
+        padding: 6px 14px;
+      }
+      .hud button {
+        pointer-events: auto;
+        background: rgba(0, 0, 0, 0.35);
+        border: none;
+        color: #fff;
+        font-size: 18px;
+        border-radius: 999px;
+        width: 42px;
+        height: 42px;
+      }
+      /* 조준 크로스헤어 */
+      .crosshair {
+        position: absolute;
+        left: 50%;
+        top: 56%;
+        width: 22px;
+        height: 22px;
+        margin: -11px 0 0 -11px;
+        border: 2px solid rgba(255, 255, 255, 0.75);
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+      }
+      /* 쿠킹 게이지 (스와이프 시작 시 표시) */
+      .cook-gauge {
+        position: absolute;
+        right: calc(env(safe-area-inset-right, 0px) + 16px);
+        top: 50%;
+        transform: translateY(-50%);
+        width: 18px;
+        height: 44vh;
+        border: 2px solid rgba(255, 255, 255, 0.65);
+        border-radius: 10px;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.4);
+        display: none;
+      }
+      .cook-gauge.on {
+        display: block;
+      }
+      .cook-fill {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 0%;
+        background: #7ed957;
+        transition: background-color 0.1s linear;
+      }
+      .cook-gauge.danger .cook-fill {
+        background: #ff4d4d;
+      }
+      .cook-label {
+        position: absolute;
+        right: calc(env(safe-area-inset-right, 0px) + 12px);
+        top: calc(50% - 44vh / 2 - 26px);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: rgba(255, 255, 255, 0.8);
+        display: none;
+      }
+      .cook-label.on {
+        display: block;
+      }
+      .hint {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
+        text-align: center;
+        font-size: clamp(12px, 3.4vw, 16px);
+        color: rgba(255, 255, 255, 0.75);
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+      }
+      .stars {
+        font-size: clamp(30px, 10vw, 56px);
+        color: #ffd54f;
+        letter-spacing: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene"></canvas>
+      <div id="ui"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

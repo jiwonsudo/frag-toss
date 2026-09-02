@@ -1,0 +1,9 @@
+node_modules
+package-lock.json
+yarn.lock
+dist
+*.local
+.DS_Store
+.vite
+ios
+android

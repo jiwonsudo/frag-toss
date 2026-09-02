@@ -1,0 +1,31 @@
+{
+  "name": "frag-toss",
+  "version": "0.1.0",
+  "description": "모바일 수류탄 던지기 게임 프로토타입 (Phaser 3 + Matter.js)",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "cap:sync": "cap sync",
+    "cap:ios": "cap open ios"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/ios": "^6.1.2",
+    "@types/three": "^0.185.4",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.20.0",
+    "three": "^0.185.1"
+  }
+}
