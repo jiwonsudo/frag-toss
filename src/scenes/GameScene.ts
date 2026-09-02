@@ -3,13 +3,15 @@ import type { Game } from '../core/Game';
 import type { GameScene } from '../core/Scene';
 import type { LevelDef, StageResult } from '../config/types';
 import { getLevel } from '../levels/levels';
-import { GAMEPLAY, COOK } from '../config/constants';
+import { GAMEPLAY, COOK, PHYSICS } from '../config/constants';
 import { buildEnvironment } from '../gameplay/Environment';
 import { makeCamera, disposeScene, v3 } from '../utils/three';
 import { PhysicsWorld } from '../gameplay/PhysicsWorld';
 import { Wall } from '../gameplay/Wall';
+import { Prop } from '../gameplay/Prop';
 import { Enemy } from '../gameplay/Enemy';
 import { Grenade } from '../gameplay/Grenade';
+import { shuffledVariants, createGrenadeMesh } from '../gameplay/models';
 import { TrajectoryPreview } from '../gameplay/TrajectoryPreview';
 import { ExplosionSystem } from '../gameplay/ExplosionSystem';
 import { computeStars } from '../gameplay/ScoreSystem';
@@ -27,8 +29,10 @@ export class GameplayScene implements GameScene {
   private level: LevelDef;
   private physics = new PhysicsWorld();
   private walls: Wall[] = [];
+  private props: Prop[] = [];
   private enemies: Enemy[] = [];
   private grenade: Grenade | null = null;
+  private held: THREE.Group | null = null;
 
   private swipe: SwipeController;
   private preview: TrajectoryPreview;
@@ -57,7 +61,7 @@ export class GameplayScene implements GameScene {
     this.grenadesTotal = this.level.grenades ?? GAMEPLAY.defaultGrenades;
     this.grenadesLeft = this.grenadesTotal;
 
-    buildEnvironment(this.three, this.game.renderer);
+    buildEnvironment(this.three, this.game.renderer, this.level.id);
     this.physics.addGround();
 
     if (this.level.camera) {
@@ -65,9 +69,16 @@ export class GameplayScene implements GameScene {
       this.camera.lookAt(v3(this.level.camera.lookAt));
     }
     this.cameraBase.copy(this.camera.position);
+    // 손에 든 수류탄이 카메라 자식으로 렌더되도록 카메라를 씬 그래프에 포함.
+    this.three.add(this.camera);
 
     for (const w of this.level.walls) this.walls.push(new Wall(this.three, this.physics, w));
-    for (const e of this.level.enemies) this.enemies.push(new Enemy(this.three, e));
+    for (const p of this.level.props ?? [])
+      this.props.push(new Prop(this.three, this.physics.world, p));
+    const variants = shuffledVariants(this.level.enemies.length, this.level.id * 97 + 13);
+    this.level.enemies.forEach((e, i) => {
+      this.enemies.push(new Enemy(this.three, e, variants[i]));
+    });
 
     this.preview = new TrajectoryPreview(this.three);
     this.explosions = new ExplosionSystem(this.three, this.camera);
@@ -121,11 +132,33 @@ export class GameplayScene implements GameScene {
     return SPAWN_OFFSET.clone().applyMatrix4(this.camera.matrixWorld);
   }
 
+  /** 손에 든 수류탄(1인칭). 쿠킹 중에만 카메라에 붙어 보임. 던지면 사라지고 날아가는 Grenade 로 교체. */
+  private showHeld(on: boolean): void {
+    if (on) {
+      if (this.held) return;
+      const g = new THREE.Group();
+      const model = createGrenadeMesh();
+      model.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) o.castShadow = true;
+      });
+      g.add(model);
+      g.position.copy(SPAWN_OFFSET);
+      g.rotation.set(0.3, 0.4, 0.15);
+      this.camera.add(g);
+      this.held = g;
+    } else if (this.held) {
+      this.camera.remove(this.held);
+      // 지오메트리/텍스처는 공유 리소스 → dispose 하지 않음
+      this.held = null;
+    }
+  }
+
   private onCookStart(): void {
     if (!this.canCook()) return;
     this.cooking = true;
     this.cookStartMs = performance.now();
     this.showGauge(true);
+    this.showHeld(true);
   }
 
   private onAim(t: SwipeThrow): void {
@@ -138,6 +171,7 @@ export class GameplayScene implements GameScene {
     this.cooking = false;
     this.preview.hide();
     this.showGauge(false);
+    this.showHeld(false);
     this.grenadesLeft--;
     this.grenadesUsed++;
 
@@ -150,6 +184,7 @@ export class GameplayScene implements GameScene {
   private onCancel(): void {
     this.cooking = false;
     this.preview.hide();
+    this.showHeld(false);
     if (!this.grenade) this.showGauge(false);
   }
 
@@ -157,6 +192,18 @@ export class GameplayScene implements GameScene {
     this.physics.step(dt);
     this.explosions.update(dt);
     for (const e of this.enemies) e.update(dt);
+    for (const w of this.walls) w.update(dt);
+
+    // 유리창: 날아가는 수류탄이 스치면 즉시 깨지고 통과
+    if (this.grenade) {
+      const gp = this.grenade.position;
+      for (const w of this.walls) {
+        if (!w.isGlass || w.broken) continue;
+        const box = new THREE.Box3().setFromObject(w.mesh);
+        box.expandByScalar(PHYSICS.grenade.radius + 0.06);
+        if (box.containsPoint(gp)) w.damage();
+      }
+    }
 
     // 신관 게이지 (손에 들고 쿠킹하는 동안만)
     if (this.cooking) {
@@ -167,6 +214,7 @@ export class GameplayScene implements GameScene {
         // 던지지 않고 끝까지 들고 있었음 → 손에서 폭발
         this.cooking = false;
         this.preview.hide();
+        this.showHeld(false);
         this.grenadesLeft--;
         this.grenadesUsed++;
         this.refreshHud();
@@ -256,7 +304,9 @@ export class GameplayScene implements GameScene {
     this.swipe.dispose();
     this.preview.dispose();
     this.explosions.dispose();
+    this.showHeld(false);
     for (const w of this.walls) w.dispose();
+    for (const p of this.props) p.dispose();
     for (const e of this.enemies) e.dispose();
     this.grenade?.dispose();
     this.physics.dispose();

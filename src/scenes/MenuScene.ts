@@ -4,6 +4,7 @@ import type { GameScene } from '../core/Scene';
 import { buildEnvironment } from '../gameplay/Environment';
 import { makeCamera, disposeScene } from '../utils/three';
 import { COLORS } from '../config/constants';
+import { createHuman, shuffledVariants } from '../gameplay/models';
 import { centerPanel, el, button } from '../ui/overlay';
 
 export class MenuScene implements GameScene {
@@ -27,17 +28,18 @@ export class MenuScene implements GameScene {
       m.receiveShadow = true;
       this.three.add(m);
     }
-    const enemyMat = new THREE.MeshStandardMaterial({ color: COLORS.enemy, roughness: 0.6 });
-    for (const [x, z] of [
-      [-1, -12],
-      [1.5, -13],
-      [0.2, -15]
-    ] as const) {
-      const e = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 1, 6, 12), enemyMat);
-      e.position.set(x, 0.8, z);
-      e.castShadow = true;
-      this.three.add(e);
-    }
+    const variants = shuffledVariants(3, 7);
+    [
+      [-1, -12, 0.3],
+      [1.5, -13, -0.5],
+      [0.2, -15, 0.1]
+    ].forEach(([x, z, ry], i) => {
+      const g = new THREE.Group();
+      g.add(createHuman(variants[i]).root);
+      g.position.set(x, 0, z);
+      g.rotation.y = ry;
+      this.three.add(g);
+    });
 
     centerPanel(
       game.ui,

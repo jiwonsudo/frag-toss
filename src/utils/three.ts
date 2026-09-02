@@ -21,6 +21,7 @@ export function v3(v: Vec3): THREE.Vector3 {
 /** 씬 하위 지오메트리/머티리얼/텍스처를 재귀적으로 해제. */
 export function disposeScene(scene: THREE.Scene): void {
   scene.traverse((obj) => {
+    if (obj.userData.sharedResource) return; // 공유 모델(병사 등)의 리소스는 유지
     const mesh = obj as THREE.Mesh;
     if (mesh.geometry) mesh.geometry.dispose();
     const mat = mesh.material;

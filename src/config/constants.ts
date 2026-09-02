@@ -9,28 +9,30 @@ export const RENDER = {
   near: 0.05,
   far: 2000,
   // ACES 톤매핑 노출.
-  exposure: 0.82,
+  exposure: 0.95,
   // 지수 안개(FogExp2) 밀도 + 색 (배그풍 옅은 헤이즈).
-  fogColor: 0xbcc6cc,
-  fogDensity: 0.014
+  fogColor: 0xb9c4c4,
+  fogDensity: 0.0085
 };
 
 /** 절차적 하늘(three Sky) + 태양. 에셋 없이 실사풍 하늘/조명 생성. */
 export const SKY = {
   // 태양 위치 (도).
-  sunElevation: 18,
-  sunAzimuth: 155,
-  turbidity: 6,
-  rayleigh: 2.2,
-  mieCoefficient: 0.006,
-  mieDirectionalG: 0.82,
+  // 정오에 가까운 높은 태양 + 카메라 뒤쪽에서 비추도록 (배그 에란겔 대낮 톤).
+  sunElevation: 42,
+  sunAzimuth: 35,
+  turbidity: 4,
+  rayleigh: 1.6,
+  mieCoefficient: 0.005,
+  mieDirectionalG: 0.8,
   // 태양광(DirectionalLight) 세기/색.
+  // 밝기는 오직 직접광(태양/반구/앰비언트)으로 결정 — IBL 미사용, 모바일/데스크톱 일관성.
   sunLightIntensity: 3.2,
-  sunLightColor: 0xfff1dc,
-  // 환경광(IBL) 반영 세기.
-  envIntensity: 0.75,
-  // 하늘 기반 보조 반구광.
-  hemiIntensity: 0.25
+  sunLightColor: 0xfff4e2,
+  // 하늘 기반 보조 반구광 (IBL 미사용 → 반구광이 하늘 반사광 역할).
+  hemiIntensity: 1.35,
+  // 최소 보정 앰비언트 (기기 무관 일정한 하한).
+  ambientIntensity: 0.45
 };
 
 export const CAMERA = {
@@ -97,9 +99,13 @@ export const EXPLOSION = {
   // 스플래시 반경(m). 이 안의 적은 벽에 가려도 사망. (섬광 이펙트도 이 값에 비례)
   splashRadius: 4.6,
   particleCount: 44,
+  // 배그풍 이펙트 레이어
+  debrisCount: 30,
+  sparkCount: 26,
+  smokePuffs: 14,
   // 카메라 흔들림
-  shakeAmp: 0.12,
-  shakeMs: 260
+  shakeAmp: 0.18,
+  shakeMs: 420
 };
 
 export const GAMEPLAY = {
@@ -111,12 +117,26 @@ export const GAMEPLAY = {
 export const COLORS = {
   ground: 0x2b2f38,
   groundGrid: 0x3d4450,
-  wall: 0x8a8f99,
-  wallDamaged: 0x5b5f68,
+  wall: 0x9a958a,
+  wallDamaged: 0x6d675d,
   grenade: 0x3f7d3f,
   enemy: 0xe94560,
   enemyDead: 0x5b3a6b,
-  explosionCore: 0xffd54f,
+  explosionCore: 0xfff2c4,
   explosionEdge: 0xff7043,
-  trajectory: 0xffffff
+  trajectory: 0xffffff,
+  // 배그풍 팔레트
+  foliageGrass: 0x6b7d3a,
+  foliageTreeTrunk: 0x5a4632,
+  foliageTreeLeaf: 0x4f6136,
+  rock: 0x7d7a71,
+  smokeDark: 0x2e2a26,
+  smokeLight: 0x9a938a,
+  spark: 0xffcaa0,
+  // 병사 모델 색
+  soldierUniform: 0x5f6247,
+  soldierVest: 0x3c3a30,
+  soldierSkin: 0xc9a07a,
+  soldierHelmet: 0x494b3c,
+  soldierBoots: 0x2a2622
 };

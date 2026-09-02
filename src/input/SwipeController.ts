@@ -29,6 +29,8 @@ export class SwipeController {
   private startX = 0;
   private startY = 0;
   private startT = 0;
+  // 실제 스와이프 모션이 시작된 시점. 쿠킹(터치 홀딩) 시간은 던지는 세기에서 제외한다.
+  private moveStartT = 0;
 
   private cookStartCb?: CookStartCb;
   private aimCb?: AimCb;
@@ -76,12 +78,18 @@ export class SwipeController {
     this.startX = e.clientX;
     this.startY = e.clientY;
     this.startT = performance.now();
+    this.moveStartT = 0;
     this.cookStartCb?.();
   };
 
   private onMove = (e: PointerEvent): void => {
     if (!this.active || !this.enabled) return;
-    const t = this.compute(e.clientX, e.clientY, performance.now() - this.startT);
+    // 처음으로 유의미하게 움직인 순간을 스와이프 시작으로 기록 (쿠킹 홀딩 시간 배제)
+    if (this.moveStartT === 0) {
+      const moved = Math.hypot(e.clientX - this.startX, e.clientY - this.startY);
+      if (moved > 6) this.moveStartT = performance.now();
+    }
+    const t = this.compute(e.clientX, e.clientY);
     if (t) this.aimCb?.(t);
   };
 
@@ -89,12 +97,12 @@ export class SwipeController {
     if (!this.active) return;
     this.active = false;
     if (!this.enabled) return;
-    const t = this.compute(e.clientX, e.clientY, performance.now() - this.startT);
+    const t = this.compute(e.clientX, e.clientY);
     if (t) this.throwCb?.(t);
     else this.cancelCb?.();
   };
 
-  private compute(px: number, py: number, dtMs: number): SwipeThrow | null {
+  private compute(px: number, py: number): SwipeThrow | null {
     const dx = px - this.startX;
     const dy = py - this.startY;
     const dist = Math.hypot(dx, dy);
@@ -105,7 +113,9 @@ export class SwipeController {
     if (nUp < SWIPE.minUp) return null;
 
     const nx = dx / vh;
-    const dur = THREE.MathUtils.clamp(dtMs, SWIPE.minDurationMs, SWIPE.maxDurationMs);
+    // 세기는 "실제 스와이프 모션" 소요 시간만으로 계산 — 홀딩(쿠킹) 시간은 제외.
+    const moveMs = performance.now() - (this.moveStartT || this.startT);
+    const dur = THREE.MathUtils.clamp(moveMs, SWIPE.minDurationMs, SWIPE.maxDurationMs);
     const normSpeed = dist / vh / dur; // (화면비율)/ms
     const speed = THREE.MathUtils.clamp(
       normSpeed * SWIPE.powerScale,

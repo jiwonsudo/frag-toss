@@ -1,8 +1,9 @@
 import { Game } from './core/Game';
 import { initPhysics } from './gameplay/PhysicsWorld';
+import { preloadModels } from './gameplay/models';
 
 async function bootstrap(): Promise<void> {
-  await initPhysics();
+  await Promise.all([initPhysics(), preloadModels()]);
 
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
   const ui = document.getElementById('ui') as HTMLElement;
