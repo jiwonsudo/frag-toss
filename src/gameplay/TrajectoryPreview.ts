@@ -36,10 +36,15 @@ export class TrajectoryPreview {
     let vy = velocity.y;
     let vz = velocity.z;
     const dt = TRAJECTORY.dt;
+    // Rapier 와 동일한 선형 담핑 (스텝마다 vel *= 1/(1+dt*c)) — 미리보기=실제.
+    const damp = 1 / (1 + dt * PHYSICS.grenade.linearDamping);
 
     let count = 0;
     for (let i = 0; i < TRAJECTORY.steps && count < this.maxDots; i++) {
       vy += PHYSICS.gravity * dt;
+      vx *= damp;
+      vy *= damp;
+      vz *= damp;
       x += vx * dt;
       y += vy * dt;
       z += vz * dt;

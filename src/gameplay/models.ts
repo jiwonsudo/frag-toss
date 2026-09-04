@@ -4,7 +4,7 @@ import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.j
 import grenadeUrl from '../assets/m67_hand_grenade.glb?url';
 import girlUrl from '../assets/pubg_girl_pose_t.glb?url';
 import treeUrl from '../assets/urban_tree.glb?url';
-import { PHYSICS } from '../config/constants';
+import { PHYSICS, COLORS } from '../config/constants';
 
 /**
  * 외부 GLB 에셋 로더. 앱 시작 시 한 번 로드하고 인스턴스는 복제해서 쓴다
@@ -64,14 +64,15 @@ function normalize(root: THREE.Object3D, targetHeight: number, feetToGround = tr
   return root;
 }
 
-/** Mixamo T-포즈 위팔 본을 내려 팔을 몸통 옆으로. */
+/**
+ * Mixamo T-포즈 위팔 본을 내려 팔을 몸통 옆으로.
+ * 이 리그의 팔은 로컬 X축으로 들고내림 (Z는 트위스트라 효과 없음) — 축 잘못 잡으면 T포즈 그대로 남음.
+ */
 function relaxArms(root: THREE.Object3D): void {
   root.traverse((o) => {
     const n = o.name;
-    if (/LeftArm(_|$)/.test(n)) o.rotation.z -= 1.15;
-    else if (/RightArm(_|$)/.test(n)) o.rotation.z += 1.15;
-    else if (/LeftForeArm(_|$)/.test(n)) o.rotation.z -= 0.12;
-    else if (/RightForeArm(_|$)/.test(n)) o.rotation.z += 0.12;
+    if (/(Left|Right)Arm(_|$)/.test(n)) o.rotation.x += 1.22;
+    else if (/(Left|Right)ForeArm(_|$)/.test(n)) o.rotation.x += 0.3;
   });
 }
 
@@ -96,12 +97,20 @@ export async function preloadModels(): Promise<void> {
   const tw = new THREE.Group();
   tw.add(tree.scene);
   treeSource = normalize(tw, 6.2);
-  // 잎이 너무 어둡게 나와서 살짝 밝히고 양면 처리 (카드형 잎 구멍 방지)
+  // GLB 에 색·텍스처가 전혀 없어 전부 흰색(→회색)으로 렌더됨. 잎/가지 색을 직접 입힌다.
   treeSource.traverse((o) => {
     const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
-    if (m && 'color' in m) {
-      m.side = THREE.DoubleSide;
-      if (/folha|leaf|folhagem/i.test(m.name || '')) m.color.multiplyScalar(1.5);
+    if (!m || !('color' in m)) return;
+    m.side = THREE.DoubleSide;
+    if (/folha|leaf|folhagem/i.test(m.name || '')) {
+      m.color.setHex(COLORS.foliageTreeLeaf);
+      m.roughness = 0.9;
+      m.metalness = 0;
+    } else {
+      // galho_fino 등 가지/줄기
+      m.color.setHex(COLORS.foliageTreeTrunk);
+      m.roughness = 1;
+      m.metalness = 0;
     }
   });
 }

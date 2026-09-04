@@ -43,18 +43,22 @@ export const CAMERA = {
 
 export const PHYSICS = {
   // 중력 가속도(m/s^2). 현실(-9.81)보다 강하게 잡아 손맛/궤적을 조절.
-  gravity: -20,
+  // 낮출수록 수류탄이 더 떠서 날고(체공↑) 같은 사거리를 더 낮은 속도로 낼 수 있음.
+  gravity: -17,
   // 물리 스텝 (초). 렌더 dt 를 이 값으로 누적 시뮬레이션.
   fixedStep: 1 / 60,
   maxSubSteps: 5,
   grenade: {
     radius: 0.13,
     density: 6,
-    restitution: 0.28,
-    friction: 0.9,
-    // 담핑을 높게 잡아 수류탄이 굴러다니지 않고 비교적 빨리 멈추도록.
-    linearDamping: 0.7,
-    angularDamping: 0.8
+    restitution: 0.22,
+    friction: 1.1,
+    // 공기저항: 던지는 손맛(무게감)을 위해 남겨두되, 궤적 미리보기가 이 값을
+    // 그대로 반영하므로 "점선대로 안 떨어지는" 괴리는 없다.
+    linearDamping: 0.32,
+    angularDamping: 0.8,
+    // 지면에 닿은 뒤 적용하는 담핑 — 굴러다니지 않고 빨리 멈추도록.
+    restDamping: 3.2
   }
 };
 
@@ -64,21 +68,26 @@ export const SWIPE = {
   // 탭/롱프레스 방어용 지속시간 클램프 (ms).
   minDurationMs: 40,
   maxDurationMs: 420,
-  // 정규화 스와이프 속도(화면높이 비율/ms) -> 발사 속도(m/s) 변환 스케일. 핵심 튜닝 값.
-  powerScale: 7200,
-  minSpeed: 6.5,
-  maxSpeed: 23,
+  // 파워 곡선: 정규화 스와이프 속도(화면높이비율/ms)를 refNormSpeed 로 나눠 0~1 파워를 얻고,
+  // powerGamma 로 곡선을 먹인 뒤 min~maxSpeed 로 보간한다.
+  // gamma 를 1 근처로 두어 중간 세기 구간이 넓게 퍼지도록 (예전 2.4 는 저~중속이 다 뭉쳐서
+  // 5~10m 던지기가 거의 불가능했음). 최소속도를 올려 가까운 거리 사각도 메움.
+  refNormSpeed: 0.0043,
+  powerGamma: 1.15,
+  minSpeed: 7,
+  maxSpeed: 19,
   // 위로 스와이프한 정규화량이 이 값 이상이어야 유효 (dy<0 조건의 3D 버전).
   minUp: 0.05,
   // 가로 스와이프 성분 -> 좌우 조준각(rad).
   yawRange: 0.55,
   // 세로 스와이프 성분 -> 던지는 올려각(rad). base + ratio*range.
-  pitchBase: 0.12,
-  pitchRange: 0.75
+  // base 를 높여 살살 던져도 곡사(로브)로 나가게 — 얕게 나가 바닥에 처박히는 것 방지.
+  pitchBase: 0.32,
+  pitchRange: 0.5
 };
 
 export const TRAJECTORY = {
-  steps: 110,
+  steps: 150,
   dt: 1 / 60,
   // 점을 몇 스텝마다 찍을지.
   dotEvery: 4,
@@ -96,7 +105,7 @@ export const COOK = {
 };
 
 export const EXPLOSION = {
-  // 스플래시 반경(m). 이 안의 적은 벽에 가려도 사망. (섬광 이펙트도 이 값에 비례)
+  // 스플래시 반경(m). 이 안이라도 온전한 콘크리트 벽에 가려지면 살아남는다. (섬광 이펙트도 이 값에 비례)
   splashRadius: 4.6,
   particleCount: 44,
   // 배그풍 이펙트 레이어

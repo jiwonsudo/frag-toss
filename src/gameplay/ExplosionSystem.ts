@@ -89,7 +89,7 @@ export class ExplosionSystem {
     for (const e of enemies) {
       if (!e.alive) continue;
       const dist = e.center.distanceTo(point);
-      if (dist <= r) {
+      if (dist <= r && !blockedByWall(point, e.center, walls)) {
         // 폭심에서 적을 향하는 수평 방향 + 근접도(0~1) 를 넘겨 날아가는 세기를 조절
         const dir = new THREE.Vector3().subVectors(e.center, point);
         dir.y = 0;
@@ -340,6 +340,31 @@ export class ExplosionSystem {
 
 function easeOut(k: number): number {
   return 1 - (1 - k) * (1 - k);
+}
+
+const _ray = new THREE.Ray();
+const _box = new THREE.Box3();
+const _hit = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+
+/**
+ * 폭심과 적 사이를 온전한 콘크리트 벽이 가로막으면 파편이 닿지 않는다.
+ * 유리(깨졌든 아니든)와 이미 파괴된 벽은 통과. 층 슬래브도 콘크리트 벽이라 위/아래를 가린다.
+ */
+function blockedByWall(from: THREE.Vector3, to: THREE.Vector3, walls: Wall[]): boolean {
+  _dir.subVectors(to, from);
+  const len = _dir.length();
+  if (len < 1e-4) return false;
+  _dir.divideScalar(len);
+  _ray.set(from, _dir);
+  for (const w of walls) {
+    if (w.broken || w.isGlass) continue;
+    _box.setFromObject(w.mesh);
+    const p = _ray.intersectBox(_box, _hit);
+    // 교차점이 폭심~적 구간 안쪽(양끝 살짝 여유)에 있으면 차폐된 것.
+    if (p && from.distanceTo(p) > 0.2 && from.distanceTo(p) < len - 0.2) return true;
+  }
+  return false;
 }
 
 function makeSmokeTexture(): THREE.Texture {

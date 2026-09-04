@@ -33,6 +33,8 @@ export class GameplayScene implements GameScene {
   private enemies: Enemy[] = [];
   private grenade: Grenade | null = null;
   private held: THREE.Group | null = null;
+  // 쿠킹 중 손가락 가로 이동으로 잡은 조준 오프셋 (카메라 로컬 X, m)
+  private aimOffsetX = 0;
 
   private swipe: SwipeController;
   private preview: TrajectoryPreview;
@@ -86,6 +88,7 @@ export class GameplayScene implements GameScene {
 
     this.swipe = new SwipeController(game.renderer.domElement, this.camera)
       .onCookStart(() => this.onCookStart())
+      .onCookMove((dx) => this.onCookMove(dx))
       .onAim((t) => this.onAim(t))
       .onThrow((t) => this.onThrow(t))
       .onCancel(() => this.onCancel());
@@ -113,7 +116,7 @@ export class GameplayScene implements GameScene {
     this.game.ui.append(this.cookLabel, this.cookGauge);
 
     this.game.ui.appendChild(
-      el('div', 'hint', '누르는 순간부터 3초 신관 · 위로 스와이프해 던지고 타이밍을 노려라')
+      el('div', 'hint', '화면 터치 순간부터 폭발 시간이 카운트돼요. 잘 조절해 보세요!')
     );
   }
 
@@ -129,7 +132,16 @@ export class GameplayScene implements GameScene {
 
   private spawnPoint(): THREE.Vector3 {
     this.camera.updateMatrixWorld();
-    return SPAWN_OFFSET.clone().applyMatrix4(this.camera.matrixWorld);
+    return SPAWN_OFFSET.clone()
+      .setX(SPAWN_OFFSET.x + this.aimOffsetX)
+      .applyMatrix4(this.camera.matrixWorld);
+  }
+
+  /** 쿠킹 중 손가락 가로 이동 → 손에 든 수류탄이 좌우로 따라감 (+ 발사 지점도 이동). */
+  private onCookMove(dxNorm: number): void {
+    if (!this.cooking) return;
+    this.aimOffsetX = THREE.MathUtils.clamp(dxNorm * 1.6, -0.4, 0.4);
+    if (this.held) this.held.position.x = SPAWN_OFFSET.x + this.aimOffsetX;
   }
 
   /** 손에 든 수류탄(1인칭). 쿠킹 중에만 카메라에 붙어 보임. 던지면 사라지고 날아가는 Grenade 로 교체. */
@@ -156,6 +168,7 @@ export class GameplayScene implements GameScene {
   private onCookStart(): void {
     if (!this.canCook()) return;
     this.cooking = true;
+    this.aimOffsetX = 0;
     this.cookStartMs = performance.now();
     this.showGauge(true);
     this.showHeld(true);
@@ -178,11 +191,13 @@ export class GameplayScene implements GameScene {
     const remainMs = COOK.durationMs - (performance.now() - this.cookStartMs);
     const p = this.spawnPoint();
     this.grenade = new Grenade(this.three, this.physics, p, t.velocity, remainMs);
+    this.aimOffsetX = 0;
     this.refreshHud();
   }
 
   private onCancel(): void {
     this.cooking = false;
+    this.aimOffsetX = 0;
     this.preview.hide();
     this.showHeld(false);
     if (!this.grenade) this.showGauge(false);

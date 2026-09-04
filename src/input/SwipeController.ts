@@ -11,6 +11,8 @@ export interface SwipeThrow {
 }
 
 type CookStartCb = () => void;
+/** 쿠킹 중 손가락의 정규화 가로 이동량(-왼쪽 ~ +오른쪽, 화면높이 비율). */
+type CookMoveCb = (dxNorm: number) => void;
 type AimCb = (t: SwipeThrow) => void;
 type ThrowCb = (t: SwipeThrow) => void;
 type CancelCb = () => void;
@@ -33,6 +35,7 @@ export class SwipeController {
   private moveStartT = 0;
 
   private cookStartCb?: CookStartCb;
+  private cookMoveCb?: CookMoveCb;
   private aimCb?: AimCb;
   private throwCb?: ThrowCb;
   private cancelCb?: CancelCb;
@@ -49,6 +52,10 @@ export class SwipeController {
   /** pointerdown 시점 (쿠킹 시작). */
   onCookStart(cb: CookStartCb): this {
     this.cookStartCb = cb;
+    return this;
+  }
+  onCookMove(cb: CookMoveCb): this {
+    this.cookMoveCb = cb;
     return this;
   }
   onAim(cb: AimCb): this {
@@ -89,6 +96,9 @@ export class SwipeController {
       const moved = Math.hypot(e.clientX - this.startX, e.clientY - this.startY);
       if (moved > 6) this.moveStartT = performance.now();
     }
+    // 유효 스와이프 여부와 무관하게, 쿠킹 중 손가락 가로 이동을 그대로 전달 (손의 수류탄 조준)
+    this.cookMoveCb?.((e.clientX - this.startX) / window.innerHeight);
+
     const t = this.compute(e.clientX, e.clientY);
     if (t) this.aimCb?.(t);
   };
@@ -117,11 +127,10 @@ export class SwipeController {
     const moveMs = performance.now() - (this.moveStartT || this.startT);
     const dur = THREE.MathUtils.clamp(moveMs, SWIPE.minDurationMs, SWIPE.maxDurationMs);
     const normSpeed = dist / vh / dur; // (화면비율)/ms
-    const speed = THREE.MathUtils.clamp(
-      normSpeed * SWIPE.powerScale,
-      SWIPE.minSpeed,
-      SWIPE.maxSpeed
-    );
+    // 0~1 파워 → 감마 곡선(초반 완만) → 발사 속도
+    const raw = THREE.MathUtils.clamp(normSpeed / SWIPE.refNormSpeed, 0, 1);
+    const curved = Math.pow(raw, SWIPE.powerGamma);
+    const speed = THREE.MathUtils.lerp(SWIPE.minSpeed, SWIPE.maxSpeed, curved);
 
     const yawRatio = THREE.MathUtils.clamp(nx / 0.5, -1, 1);
     const yaw = -yawRatio * SWIPE.yawRange;

@@ -25,6 +25,7 @@ export class Grenade {
   private leverGeo: THREE.BufferGeometry;
   private leverMat: THREE.Material;
   private leverFlying = true;
+  private grounded = false;
   private leverVel = new THREE.Vector3();
   private leverSpin = new THREE.Vector3();
 
@@ -79,6 +80,17 @@ export class Grenade {
   update(dt: number): boolean {
     if (this.exploded) return false;
     this.ageMs += dt * 1000;
+
+    // 착지/정착 감지: 속도가 충분히 죽으면 담핑을 올려 굴러다니지 않게.
+    // (공중 최고점에서도 수평 속도는 살아 있으므로 낮은 총속도 = 지면 접촉)
+    if (!this.grounded && this.ageMs > 200) {
+      const lv = this.body.linvel();
+      const speed = Math.hypot(lv.x, lv.y, lv.z);
+      if (speed < 2.5 && Math.abs(lv.y) < 1) {
+        this.grounded = true;
+        this.body.setLinearDamping(PHYSICS.grenade.restDamping);
+      }
+    }
 
     const t = this.body.translation();
     const r = this.body.rotation();

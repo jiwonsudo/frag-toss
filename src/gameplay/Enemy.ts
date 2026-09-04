@@ -24,6 +24,17 @@ export class Enemy {
   private swaySpeed = 1.0 + Math.random() * 0.6;
   private t = 0;
 
+  // 살아있을 때의 움직임: 좌우 스텝 + 주기적으로 몸을 숙여 엄폐(피격 판정 높이도 같이 내려감)
+  private strafeAmp = 0.08 + Math.random() * 0.14;
+  private strafeSpeed = 0.5 + Math.random() * 0.5;
+  private isDucker = Math.random() < 0.55;
+  private duckPeriod = 2.4 + Math.random() * 2.6;
+  private duckPhase = Math.random() * Math.PI * 2;
+  private duckBias = 0.1 + Math.random() * 0.35; // 클수록 숙이는 시간이 길다
+  private duck = 0; // 0 = 서 있음, 1 = 완전히 숙임
+  private duckDrop = 0.24 + Math.random() * 0.12; // 숙일 때 내려가는 높이(m)
+  private duckPose = new Map<THREE.Object3D, THREE.Quaternion>();
+
   // 사망
   private deadT = 0;
   private tipAxis = new THREE.Vector3(1, 0, 0);
@@ -47,6 +58,27 @@ export class Enemy {
 
     this.base = new THREE.Vector3(def.position.x, def.position.y, def.position.z);
     this.center.set(def.position.x, def.position.y + HEIGHT * 0.5, def.position.z);
+
+    this.buildDuckPose();
+  }
+
+  /** 엄폐 자세(척추/목/머리를 앞으로 숙임) — rest 에서 곱해 만든 목표 쿼터니언. */
+  private buildDuckPose(): void {
+    if (!this.rig) return;
+    const set = (key: string, x: number): void => {
+      const b = this.rig!.bones[key];
+      const r = b && this.rig!.rest.get(b);
+      if (!b || !r) return;
+      this.duckPose.set(
+        b,
+        r.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(x, 0, 0)))
+      );
+    };
+    set('spine', 0.32);
+    set('spine1', 0.28);
+    set('spine2', 0.14);
+    set('neck', 0.18);
+    set('head', -0.15);
   }
 
   /** @param dir 폭심→적 수평 단위벡터 @param force 근접도 0~1 */
@@ -99,14 +131,37 @@ export class Enemy {
       return;
     }
     const s = Math.sin(this.t * this.swaySpeed + this.phase);
-    const s2 = Math.sin(this.t * this.swaySpeed * 0.5 + this.phase);
+
+    // 엄폐: 주기적으로 몸을 숙였다 폈다. duck 0→1 을 부드럽게 추종.
+    let duckTarget = 0;
+    if (this.isDucker) {
+      const w = Math.sin(this.t / this.duckPeriod + this.duckPhase);
+      duckTarget = w > 0.6 - this.duckBias ? 1 : 0;
+    }
+    this.duck += (duckTarget - this.duck) * Math.min(1, dt * 3.5);
+
+    // 뼈: rest → 엄폐 자세 보간
+    if (this.rig) {
+      for (const [bone, dq] of this.duckPose) {
+        const rq = this.rig.rest.get(bone)!;
+        bone.quaternion.copy(rq).slerp(dq, this.duck);
+      }
+    }
+
+    // 좌우 스텝 + 호흡 + 숙임에 따른 하강
+    const step = Math.sin(this.t * this.strafeSpeed + this.phase) * this.strafeAmp;
+    const drop = this.duck * this.duckDrop;
     this.group.rotation.set(0, this.baseYaw, s * 0.02);
     this.group.position.set(
-      this.base.x + s2 * 0.03,
-      this.base.y + PIVOT_Y + Math.abs(s) * 0.012,
+      this.base.x + step,
+      this.base.y + PIVOT_Y + Math.abs(s) * 0.012 - drop,
       this.base.z
     );
-    this.center.set(this.group.position.x, this.base.y + HEIGHT * 0.5, this.group.position.z);
+    this.center.set(
+      this.group.position.x,
+      this.base.y + HEIGHT * 0.5 - drop,
+      this.group.position.z
+    );
   }
 
   private updateDeath(dt: number): void {
